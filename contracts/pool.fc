@@ -1,0 +1,67 @@
+contracts/pool.fc;; STON.fi Liquidity Pool (simplified standard)
+#include "stdlib.fc";
+
+global slice token0_wallet;
+global slice token1_wallet;
+global int reserve0;
+global int reserve1;
+global slice lp_minter;
+global slice router;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    token0_wallet = ds~load_msg_addr();
+    token1_wallet = ds~load_msg_addr();
+    reserve0 = ds~load_coins();
+    reserve1 = ds~load_coins();
+    lp_minter = ds~load_msg_addr();
+    router = ds~load_msg_addr();
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(token0_wallet)
+        .store_slice(token1_wallet)
+        .store_coins(reserve0)
+        .store_coins(reserve1)
+        .store_slice(lp_minter)
+        .store_slice(router)
+        .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    load_data();
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    var op = in_msg_body~load_uint(32);
+
+    ;; add liquidity
+    if (op == 0xadd1iq) {
+        var amount0 = in_msg_body~load_coins();
+        var amount1 = in_msg_body~load_coins();
+
+        reserve0 += amount0;
+        reserve1 += amount1;
+
+        save_data();
+        return ();
+    }
+
+    ;; swap
+    if (op == 0xswap000) {
+        var in_amount = in_msg_body~load_coins();
+        var out_token = in_msg_body~load_uint(1);
+
+        if (out_token == 0) {
+            reserve0 -= in_amount;
+        } else {
+            reserve1 -= in_amount;
+        }
+
+        save_data();
+        return ();
+    }
+}
