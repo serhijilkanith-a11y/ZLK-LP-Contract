@@ -1,0 +1,8 @@
+contracts/stdlib.fcbuiltin accept_message;
+builtin send_raw_message;
+builtin set_data;
+builtin get_data;
+builtin get_msg_sender;
+builtin equal_slices;
+builtin throw;
+builtin throw_unless;
