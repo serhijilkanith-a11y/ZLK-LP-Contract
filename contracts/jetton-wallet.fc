@@ -1,0 +1,65 @@
+contracts/jetton-wallet.fc#include "stdlib.fc";
+
+global slice owner_address;
+global slice jetton_master_address;
+global int balance;
+
+() load_data() impure {
+    var ds = get_data().begin_parse();
+    owner_address = ds~load_msg_addr();
+    jetton_master_address = ds~load_msg_addr();
+    balance = ds~load_coins();
+}
+
+() save_data() impure {
+    set_data(begin_cell()
+        .store_slice(owner_address)
+        .store_slice(jetton_master_address)
+        .store_coins(balance)
+        .end_cell());
+}
+
+() recv_internal(int msg_value, cell in_msg_full, slice in_msg_body) impure {
+    load_data();
+
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+
+    var op = in_msg_body~load_uint(32);
+
+    ;; transfer
+    if (op == 0xf8a7ea5) {
+        var to = in_msg_body~load_msg_addr();
+        var amount = in_msg_body~load_coins();
+
+        throw_unless(101, balance >= amount);
+        balance -= amount;
+
+        send_raw_message(begin_cell()
+            .store_uint(0x178d4519, 32)
+            .store_slice(to)
+            .store_coins(amount)
+            .end_cell(), 64);
+
+        save_data();
+        return ();
+    }
+
+    ;; mint receive
+    if (op == 0x178d4519) {
+        var amount = in_msg_body~load_coins();
+        balance += amount;
+        save_data();
+        return ();
+    }
+
+    ;; burn
+    if (op == 0x595f07bc) {
+        var amount = in_msg_body~load_coins();
+        throw_unless(102, balance >= amount);
+        balance -= amount;
+        save_data();
+        return ();
+    }
+}
